@@ -38,22 +38,22 @@ server.listen(port, () => {
 //EndPoint
 //Listar recetas
 server.get('/api/recetas', async (req, res) => {
-try {
-    const conn = await getConnection();
-    const queryGetRecetas =
-        `SELECT * FROM recetas;
+    try {
+        const conn = await getConnection();
+        const queryGetRecetas =
+            `SELECT * FROM recetas;
     `;
-    const [results] = await conn.query(queryGetRecetas);
-    conn.end();
-    res.json({
-        info: { count: results.length },
-        result: results,
-    });
-}
-catch (error) {
-    console.error("Error al obtener el listado de recetas:", error);
-    res.status(500).json({ error: "Error en la Base de datos" });
-}
+        const [results] = await conn.query(queryGetRecetas);
+        conn.end();
+        res.json({
+            info: { count: results.length },
+            result: results,
+        });
+    }
+    catch (error) {
+        console.error("Error al obtener el listado de recetas:", error);
+        res.status(500).json({ error: "Error en la Base de datos" });
+    }
 
 });
 
@@ -77,17 +77,50 @@ server.get('/api/recetas/:id', async (req, res) => {
 
         res.json({
             results: {
-           
+
                 name: receta.nombre,
                 ingredientes: receta.ingredientes,
                 instrucciones: receta.instrucciones
-           
-        }
+
+            }
+        });
+        conn.end();
+
+    } catch (error) {
+        console.error("Error al obtener la receta:", error);
+        res.status(500).json({ error: "Error en la Base de datos" });
+    }
 });
-conn.end();
-    
-  }  catch (error) {
-    console.error("Error al obtener la receta:", error);
-    res.status(500).json({ error: "Error en la Base de datos" });
-}
+
+//Crear nueva receta
+server.post('/api/recetas/', async (req, res) => {
+    try {
+        if (!req.body.nombre || !req.body.ingredientes || !req.body.instrucciones) {
+            res.status(400).json(createErrorResponse('Todos los campos son obligatorios'));
+            return;
+        }
+        const conn = await getConnection();
+
+        const insterRecipe =
+            `INSERT INTO recetas(nombre, ingredientes, instrucciones)
+            VALUES( ?,  ? , ? )`;
+
+        const [insertResult] = await conn.execute(insterRecipe, [req.body.nombre, req.body.ingredientes, req.body.instrucciones, false]);
+
+        conn.end();
+        res.json(
+            {
+                success: true,
+                id: insertResult.inserId
+            }
+        );
+    }
+    catch (error) {
+
+        res.json({
+            success: false,
+            error: 'Eror en la base de datos al crear una nueva receta'
+        });
+    }
+
 });
