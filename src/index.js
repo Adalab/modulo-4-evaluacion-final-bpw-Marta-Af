@@ -124,3 +124,33 @@ server.post('/api/recetas/', async (req, res) => {
     }
 
 });
+
+//Actualizar datos de la receta
+server.put ('/api/recetas/:recetaId' , async (req, res) => {
+
+    try{
+
+        const conn = await getConnection();
+
+        const upDateRecipe = `UPDATE recetas
+        SET id = ?
+       WHERE id = ?;`
+
+const [resultUpDate] = await conn.execute(upDateRecipe, [req.body.id, req.params.recetaId]);
+conn.end();
+
+res.json({
+    success: true
+});
+} catch (error) {
+console.error("Error al actualizar la receta:", error);
+res.status(500).json({
+    success: false,
+    error: 'Error en la base de datos al actualizar la receta'
+});
+}
+});
+
+
+
+
