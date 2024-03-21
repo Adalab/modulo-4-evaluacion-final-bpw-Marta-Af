@@ -28,7 +28,12 @@ async function getConnection() {
 
     return connection;
 }
-
+const createErrorResponse = (message) => { //Crear mensaje de eror
+    return {
+        success: false,
+        error: message
+    };
+}
 
 //Arrancar servidor
 server.listen(port, () => {
@@ -93,13 +98,6 @@ server.get('/api/recetas/:id', async (req, res) => {
 });
 
 //Crear nueva receta
-
-const createErrorResponse = (message) => { //Crear mensaje de eror
-    return {
-        success: false,
-        error: message
-    };
-}
 server.post('/api/recetas/:recetaId', async (req, res) => {
     try {
         if (!req.body.nombre === '' || !req.body.ingredientes === '' || !req.body.instrucciones === '') {
@@ -130,6 +128,7 @@ server.post('/api/recetas/:recetaId', async (req, res) => {
     }
     
 });
+
 //Actualizar datos de la receta
 server.put('/api/recetas/:recetaId' , async (req, res) => {
 
