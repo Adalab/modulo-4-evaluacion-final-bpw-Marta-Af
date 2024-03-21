@@ -93,45 +93,48 @@ server.get('/api/recetas/:id', async (req, res) => {
 });
 
 //Crear nueva receta
-server.post('/api/recetas/', async (req, res) => {
+
+const createErrorResponse = (message) => { //Crear mensaje de eror
+    return {
+        success: false,
+        error: message
+    };
+}
+server.post('/api/recetas/:recetaId', async (req, res) => {
     try {
-        if (!req.body.nombre || !req.body.ingredientes || !req.body.instrucciones) {
+        if (!req.body.nombre === '' || !req.body.ingredientes === '' || !req.body.instrucciones === '') {
             res.status(400).json(createErrorResponse('Todos los campos son obligatorios'));
             return;
         }
         const conn = await getConnection();
+        const instertRecipe =
+        `INSERT INTO recetas ( nombre, ingredientes, instruccione, completed)
+        VALUES( ?,  ? , ? ,?)`;
 
-        const insterRecipe =
-            `INSERT INTO recetas(nombre, ingredientes, instrucciones)
-            VALUES( ?,  ? , ? )`;
-
-        const [insertResult] = await conn.execute(insterRecipe, [req.body.nombre, req.body.ingredientes, req.body.instrucciones, false]);
-
+        const [insertResult] = await conn.execute(instertRecipe, [req.body.nombre, req.body.ingredientes, req.body.instrucciones, false]);
         conn.end();
+        
         res.json(
             {
                 success: true,
-                id: insertResult.inserId
+                id: insertResult.insertId
             }
         );
     }
     catch (error) {
-
+        console.error("Error al añadir nueva receta", error);
         res.json({
             success: false,
             error: 'Eror en la base de datos al crear una nueva receta'
         });
     }
-
+    
 });
-
 //Actualizar datos de la receta
 server.put ('/api/recetas/:recetaId' , async (req, res) => {
 
     try{
-
         const conn = await getConnection();
-
         const upDateRecipe = `UPDATE recetas
         SET id = ?
        WHERE id = ?;`
