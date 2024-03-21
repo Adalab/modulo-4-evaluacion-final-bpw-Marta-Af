@@ -131,7 +131,7 @@ server.post('/api/recetas/:recetaId', async (req, res) => {
     
 });
 //Actualizar datos de la receta
-server.put ('/api/recetas/:recetaId' , async (req, res) => {
+server.put('/api/recetas/:recetaId' , async (req, res) => {
 
     try{
         const conn = await getConnection();
@@ -154,6 +154,31 @@ res.status(500).json({
 }
 });
 
-
+//Eliminar receta
+server.delete('/api/recetas/:recetasId', async (req, res) => {
+    try {
+    const conn = await getConnection();
+    
+    const deleteRecipe = `
+    DELETE FROM recetas 
+    WHERE id = ?
+    `;
+    
+    const [deleteResult] = await conn.execute (deleteRecipe, [req.params.recetasId]);
+    conn.end();
+    
+    res.json ({
+        success:true,
+        message: "Receta eliminada correctamente"
+    });
+    }
+    catch (error) {
+        res.json ({
+        success: false,
+        error: 'Error en la base de datos'
+    });
+    }
+})
+ 
 
 
