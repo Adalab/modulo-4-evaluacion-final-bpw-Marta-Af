@@ -34,7 +34,12 @@ async function getConnection() {
 server.listen(port, () => {
     console.log(`Server has been started in http://localhost:${port}`)
 });
-
+const createErrorResponse = (message) => { //Crear mensaje de eror
+    return {
+        success: false,
+        error: message
+    };
+}
 //EndPoint
 //Listar recetas
 server.get('/api/recetas', async (req, res) => {
@@ -44,6 +49,7 @@ server.get('/api/recetas', async (req, res) => {
             `SELECT * FROM recetas;
     `;
         const [results] = await conn.query(queryGetRecetas);
+
         conn.end();
         res.json({
             info: { count: results.length },
@@ -69,19 +75,19 @@ server.get('/api/recetas/:id', async (req, res) => {
         WHERE id = ?;`;
 
         const [results] = await conn.query(queryGetId, [recetaId]);
-
+        const connection = await getConnection();
+        
         if (results.length === 0) {
             return res.status(404).json({ error: "Receta no encontrada" });
         }
+
         const receta = results[0];
 
         res.json({
             results: {
-
                 name: receta.nombre,
                 ingredientes: receta.ingredientes,
                 instrucciones: receta.instrucciones
-
             }
         });
         conn.end();
@@ -91,33 +97,28 @@ server.get('/api/recetas/:id', async (req, res) => {
         res.status(500).json({ error: "Error en la Base de datos" });
     }
 });
-
 //Crear nueva receta
 
-const createErrorResponse = (message) => { //Crear mensaje de eror
-    return {
-        success: false,
-        error: message
-    };
-}
 server.post('/api/recetas/:recetaId', async (req, res) => {
     try {
-        if (!req.body.nombre === '' || !req.body.ingredientes === '' || !req.body.instrucciones === '') {
-            res.status(400).json(createErrorResponse('Todos los campos son obligatorios'));
-            return;
-        }
-        const conn = await getConnection();
-        const instertRecipe =
-        `INSERT INTO recetas ( nombre, ingredientes, instruccione, completed)
-        VALUES( ?,  ? , ? ,?)`;
 
-        const [insertResult] = await conn.execute(instertRecipe, [req.body.nombre, req.body.ingredientes, req.body.instrucciones, false]);
-        conn.end();
-        
+        console.log(req.body);
+        if (!req.body.nombre || !req.body.ingredientes || !req.body.instrucciones) {
+            res.json(createErrorResponse('Todos los campos son obligatorios'));
+            return;
+        }      
+        const conn = await getConnection();
+        let instertRecipe =
+        `INSERT INTO recetas ( nombre, ingredientes, instrucciones,)
+        VALUES( ?,  ? , ? )`;
+
+        const [insertResult] = await conn.execute(instertRecipe, [req.body.nombre, req.body.ingredientes, req.body.instrucciones]);
+
+        conn.end();  
         res.json(
             {
-                success: true,
-                id: insertResult.insertId
+            success: true,
+            id: insertResult.insertId
             }
         );
     }
@@ -128,57 +129,95 @@ server.post('/api/recetas/:recetaId', async (req, res) => {
             error: 'Eror en la base de datos al crear una nueva receta'
         });
     }
-    
+
+
 });
 //Actualizar datos de la receta
-server.put('/api/recetas/:recetaId' , async (req, res) => {
+server.put('/api/recetas/:recetaId', async (req, res) => {
+    try {
+        const recetaId = parseInt(req.params.recetaId); // id de la receta
 
-    try{
         const conn = await getConnection();
-        const upDateRecipe = `UPDATE recetas
-        SET id = ?
-       WHERE id = ?;`
+        const updateRecipe = `
+            UPDATE recetas
+            SET nombre = ?, ingredientes = ?, instrucciones = ?
+            WHERE id = ?
+        `;
 
-const [resultUpDate] = await conn.execute(upDateRecipe, [req.body.id, req.params.recetaId]);
-conn.end();
+        const { nombre, ingredientes, instrucciones } = req.body;
 
-res.json({
-    success: true
-});
-} catch (error) {
-console.error("Error al actualizar la receta:", error);
-res.status(500).json({
-    success: false,
-    error: 'Error en la base de datos al actualizar la receta'
-});
-}
+        const [resultUpRecipe] = await conn.execute(updateRecipe, [nombre, ingredientes, instrucciones, recetaId]);
+        console.log(resultUpRecipe);
+        conn.end();
+
+        res.json({
+            success: true,   
+            message:`Receta con id ${recetaId} actualizada correctamente`
+       
+      
+        });
+    } catch (error) {
+        console.error("Error al actualizar la receta:", error);
+        res.json({
+            success: false,
+            message: `Error en la base de datos`
+        });
+    }
 });
 
 //Eliminar receta
-server.delete('/api/recetas/:recetasId', async (req, res) => {
+server.delete('/api/recetas/:recetaId', async (req, res) => {
     try {
-    const conn = await getConnection();
-    
-    const deleteRecipe = `
-    DELETE FROM recetas 
-    WHERE id = ?
-    `;
-    
-    const [deleteResult] = await conn.execute (deleteRecipe, [req.params.recetasId]);
-    conn.end();
-    
-    res.json ({
-        success:true,
-        message: "Receta eliminada correctamente"
-    });
+        const conn = await getConnection();
+        const recetaId = parseInt(req.params.recetaId);
+
+        const deleteRecipe = `
+            DELETE FROM recetas 
+            WHERE id = ?
+        `;
+        
+        const [deleteResult] = await conn.execute(deleteRecipe, [recetaId]);
+        console.log(deleteResult);
+        conn.end();
+        
+       
+        res.json({
+            
+            success: true,
+            message: `Receta con id ${recetaId} eliminada correctamente`
+        });
     }
     catch (error) {
-        res.json ({
-        success: false,
-        error: 'Error en la base de datos'
-    });
+        console.error("Error al eliminar la receta:", error);
+        res.json({
+            success: false,
+            error: 'Error en la base de datos'
+        });
     }
-})
+});
  
+// Filtrar por ingredientes
+server.get('/api/recetas/', async (req, res) =>  {
+
+    const resultIngredientes = body.query.ingredientes;
+
+    const conn = await getConnection();
+    
+
+    const  resultFilter = `
+    SELECT * FROM recetas
+    WHERE ingredientes
+    LIKE '%ajo%'
+    `;
+const [results] = await conn.execute(query, [`%${ingredientes}%`]);
+conn.end();
+
+res.json ({
+    success: true,
+    results: results,
+     count: results.length
+})
+
+})
 
 
