@@ -29,6 +29,39 @@ async function getConnection() {
     return connection;
 }
 
+//Consultar si el id existe
+async function checkededId( conn, recetaId) {
+    try {
+     
+        
+        const checkId = `
+            SELECT * FROM recetas
+            WHERE id = ?
+        `;
+        
+        const [result] = await conn.execute(checkId, [recetaId]);
+       
+
+        if (result.length === 0) {
+            return {
+                success: false,
+                message: 'El ID seleccionado no existe'
+            };
+        } else {
+            return {
+                success: true
+            };
+        }
+    } catch (error) {
+      
+        return {
+            success: false,
+            message: 'Error en la base de datos'
+        };
+    }
+}
+
+
 
 //Arrancar servidor
 server.listen(port, () => {
@@ -66,16 +99,26 @@ server.get('/api/recetas', async (req, res) => {
 //Obtener receta por id
 server.get('/api/recetas/:id', async (req, res) => {
     const recetaId = req.params.id; // Obtener por query params el id de la receta
-
+    
     try {
         const conn = await getConnection();
+        const json = await checkededId( conn , recetaId ); //Funcion que conecta con la bd y revisa si esta el id
+        console.log(json);
+
+        if( json.success === false ) {
+            conn.end();
+
+            res.json(json);
+            return;
+        }
+
         let queryGetId = `
         SELECT * 
         FROM recetas
         WHERE id = ?;`;
 
-        const [results] = await conn.query(queryGetId, [recetaId]);
-        const connection = await getConnection();
+      const [results] = await conn.query(queryGetId, [recetaId]);
+    
         
         if (results.length === 0) {
             return res.status(404).json({ error: "Receta no encontrada" });
@@ -99,62 +142,59 @@ server.get('/api/recetas/:id', async (req, res) => {
 });
 //Crear nueva receta
 
-server.post('/api/recetas/:recetaId', async (req, res) => {
+server.post('/api/recetas', async (req, res) => {
+    const { nombre, ingredientes, instrucciones } = req.body;
+   
+    // if (!nombre || nombre === '' ||!ingredientes || ingredientes === ''||!instrucciones || instrucciones === '') {
+    //     return res.status(400).json({ success: false, error: 'Todos los campos son obligatorios' });
+    // }      
+
     try {
-
-        console.log(req.body);
-        if (!req.body.nombre || !req.body.ingredientes || !req.body.instrucciones) {
-            res.json(createErrorResponse('Todos los campos son obligatorios'));
-            return;
-        }      
         const conn = await getConnection();
-        let instertRecipe =
-        `INSERT INTO recetas ( nombre, ingredientes, instrucciones,)
-        VALUES( ?,  ? , ? )`;
-
-        const [insertResult] = await conn.execute(instertRecipe, [req.body.nombre, req.body.ingredientes, req.body.instrucciones]);
+        let insertRecipe =
+            `INSERT INTO recetas (nombre, ingredientes, instrucciones)
+            VALUES (?,?,?);
+            `;
+        const [insertResult] = await conn.execute(insertRecipe, [nombre, ingredientes, instrucciones]);
 
         conn.end();  
-        res.json(
-            {
+        res.json({
             success: true,
             id: insertResult.insertId
-            }
-        );
-    }
-    catch (error) {
+        });
+    } catch (error) {
         console.error("Error al añadir nueva receta", error);
         res.json({
             success: false,
-            error: 'Eror en la base de datos al crear una nueva receta'
+            error: 'Error en la base de datos al crear una nueva receta'
         });
     }
-
-
 });
+
 //Actualizar datos de la receta
 server.put('/api/recetas/:recetaId', async (req, res) => {
-    try {
+try {
         const recetaId = parseInt(req.params.recetaId); // id de la receta
-
         const conn = await getConnection();
+        const json = await checkededId( conn , recetaId ); //Funcion que conecta con la bd y revisa si esta el id
+        console.log(json);
+        if( json.success === false ) {
+            conn.end();
+            res.json(json);
+            return;
+        }
         const updateRecipe = `
             UPDATE recetas
             SET nombre = ?, ingredientes = ?, instrucciones = ?
             WHERE id = ?
         `;
-
         const { nombre, ingredientes, instrucciones } = req.body;
-
         const [resultUpRecipe] = await conn.execute(updateRecipe, [nombre, ingredientes, instrucciones, recetaId]);
         console.log(resultUpRecipe);
         conn.end();
-
         res.json({
             success: true,   
             message:`Receta con id ${recetaId} actualizada correctamente`
-       
-      
         });
     } catch (error) {
         console.error("Error al actualizar la receta:", error);
@@ -168,8 +208,9 @@ server.put('/api/recetas/:recetaId', async (req, res) => {
 //Eliminar receta
 server.delete('/api/recetas/:recetaId', async (req, res) => {
     try {
+        
         const conn = await getConnection();
-        const recetaId = parseInt(req.params.recetaId);
+        let recetaId = parseInt(req.params.recetaId);
 
         const deleteRecipe = `
             DELETE FROM recetas 
@@ -179,15 +220,20 @@ server.delete('/api/recetas/:recetaId', async (req, res) => {
         const [deleteResult] = await conn.execute(deleteRecipe, [recetaId]);
         console.log(deleteResult);
         conn.end();
-        
-       
-        res.json({
-            
-            success: true,
-            message: `Receta con id ${recetaId} eliminada correctamente`
-        });
-    }
-    catch (error) {
+
+        if (deleteResult.affectedRows > 0) {
+                res.json({
+                    success: true,
+                    message: `Receta con id ${recetaId} eliminada correctamente`
+                });
+            } else {
+                res.json({
+                    success: false,
+                    message: 'No se ha encontrado la receta'
+                });
+            }
+
+        }catch (error) {
         console.error("Error al eliminar la receta:", error);
         res.json({
             success: false,
