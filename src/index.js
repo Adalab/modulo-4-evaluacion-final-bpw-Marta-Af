@@ -235,3 +235,10 @@ server.delete('/api/recetas/:recetaId', async (req, res) => {
     }
 });
  
+//Registro de usuario (POST /registro):
+server.post('/api/recetas/usuarios', async (req, res) => {
+
+
+});
+
+//Inicio de sesión (POST /login)
