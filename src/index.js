@@ -18,7 +18,7 @@ async function getConnection() {
         host: process.env.MYSQL_HOST || 'localhost',
         user: process.env.MYSQL_USER || 'root',
         password: process.env.MYSQL_PASS,
-        database: 'recetas_db'
+        database: 'recetas_db',
     });
     await connection.connect();
 
@@ -61,8 +61,6 @@ async function checkededId( conn, recetaId) {
     }
 }
 
-
-
 //Arrancar servidor
 server.listen(port, () => {
     console.log(`Server has been started in http://localhost:${port}`)
@@ -74,7 +72,7 @@ const createErrorResponse = (message) => { //Crear mensaje de eror
     };
 }
 //EndPoint
-//Listar recetas
+//Listar recetas ok
 server.get('/api/recetas', async (req, res) => {
     try {
         const conn = await getConnection();
@@ -96,36 +94,36 @@ server.get('/api/recetas', async (req, res) => {
 
 });
 
-//Obtener receta por id
+//Obtener receta por id ok
 server.get('/api/recetas/:id', async (req, res) => {
-    const recetaId = req.params.id; // Obtener por query params el id de la receta
-    
     try {
+        const recetaId = req.params.id; // Obtener por query params el id de la receta
+        if (!recetaId || recetaId === '') {
+            return res.status(400).json({ success: false, error: 'Debe añadir un id' });
+        }
+        if (isNaN(recetaId)) {
+            return res.status(400).json({ success: false, error: 'El id debe ser un numero' });
+        }
+        if (!/^\d+$/.test(recetaId)) {
+            return res.status(400).json({ success: false, error: 'El ID debe contener solo números' });
+        }
         const conn = await getConnection();
-        const json = await checkededId( conn , recetaId ); //Funcion que conecta con la bd y revisa si esta el id
+        const json = await checkededId(conn, recetaId); //Funcion que conecta con la bd y revisa si esta el id
         console.log(json);
-
-        if( json.success === false ) {
+        if (json.success === false) {
             conn.end();
-
             res.json(json);
             return;
         }
-
         let queryGetId = `
         SELECT * 
         FROM recetas
         WHERE id = ?;`;
-
-      const [results] = await conn.query(queryGetId, [recetaId]);
-    
-        
+        const [results] = await conn.query(queryGetId, [recetaId]);
         if (results.length === 0) {
             return res.status(404).json({ error: "Receta no encontrada" });
         }
-
         const receta = results[0];
-
         res.json({
             results: {
                 name: receta.nombre,
@@ -134,29 +132,28 @@ server.get('/api/recetas/:id', async (req, res) => {
             }
         });
         conn.end();
-
     } catch (error) {
         console.error("Error al obtener la receta:", error);
         res.status(500).json({ error: "Error en la Base de datos" });
     }
 });
-//Crear nueva receta
 
+//Crear nueva receta 
 server.post('/api/recetas', async (req, res) => {
-    const { nombre, ingredientes, instrucciones } = req.body;
-   
-    // if (!nombre || nombre === '' ||!ingredientes || ingredientes === ''||!instrucciones || instrucciones === '') {
-    //     return res.status(400).json({ success: false, error: 'Todos los campos son obligatorios' });
-    // }      
-
     try {
+        const { nombre, ingredientes, instrucciones } = req.body; 
+   
+        if (!nombre || nombre === '' || 
+        !ingredientes|| ingredientes === ''  || 
+        !instrucciones || instrucciones === '' ) {
+            return res.status(400).json({ success: false, error: 'Todos los campos son obligatorios' });
+        }      
         const conn = await getConnection();
-        let insertRecipe =
-            `INSERT INTO recetas (nombre, ingredientes, instrucciones)
-            VALUES (?,?,?);
-            `;
+        const insertRecipe = `
+        INSERT INTO recetas (nombre,ingredientes,instrucciones) 
+        VALUES ( ?, ?, ?)`;
         const [insertResult] = await conn.execute(insertRecipe, [nombre, ingredientes, instrucciones]);
-
+        console.log(insertResult);
         conn.end();  
         res.json({
             success: true,
@@ -171,13 +168,14 @@ server.post('/api/recetas', async (req, res) => {
     }
 });
 
-//Actualizar datos de la receta
+
+//Actualizar datos de la receta ok
 server.put('/api/recetas/:recetaId', async (req, res) => {
 try {
         const recetaId = parseInt(req.params.recetaId); // id de la receta
         const conn = await getConnection();
         const json = await checkededId( conn , recetaId ); //Funcion que conecta con la bd y revisa si esta el id
-        console.log(json);
+       
         if( json.success === false ) {
             conn.end();
             res.json(json);
@@ -205,34 +203,29 @@ try {
     }
 });
 
-//Eliminar receta
+//Eliminar receta ok
 server.delete('/api/recetas/:recetaId', async (req, res) => {
     try {
-        
         const conn = await getConnection();
         let recetaId = parseInt(req.params.recetaId);
-
         const deleteRecipe = `
             DELETE FROM recetas 
             WHERE id = ?
         `;
-        
         const [deleteResult] = await conn.execute(deleteRecipe, [recetaId]);
         console.log(deleteResult);
         conn.end();
-
         if (deleteResult.affectedRows > 0) {
                 res.json({
                     success: true,
                     message: `Receta con id ${recetaId} eliminada correctamente`
                 });
-            } else {
+                } else {
                 res.json({
                     success: false,
                     message: 'No se ha encontrado la receta'
                 });
             }
-
         }catch (error) {
         console.error("Error al eliminar la receta:", error);
         res.json({
@@ -242,28 +235,3 @@ server.delete('/api/recetas/:recetaId', async (req, res) => {
     }
 });
  
-// Filtrar por ingredientes
-server.get('/api/recetas/', async (req, res) =>  {
-
-    const resultIngredientes = body.query.ingredientes;
-
-    const conn = await getConnection();
-    
-
-    const  resultFilter = `
-    SELECT * FROM recetas
-    WHERE ingredientes
-    LIKE '%ajo%'
-    `;
-const [results] = await conn.execute(query, [`%${ingredientes}%`]);
-conn.end();
-
-res.json ({
-    success: true,
-    results: results,
-     count: results.length
-})
-
-})
-
-
