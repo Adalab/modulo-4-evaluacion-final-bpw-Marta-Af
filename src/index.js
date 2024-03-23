@@ -236,8 +236,73 @@ server.delete('/api/recetas/:recetaId', async (req, res) => {
 });
  
 //Registro de usuario (POST /registro):
-server.post('/api/recetas/usuarios', async (req, res) => {
+server.post('/api/usuarios_db', async (req, res) => {
+    // try {
+    //     const conn = await getConnection();
+    //     const queryUsers =
+    //         `SELECT * FROM usuarios_db;
+    // `;
+    // console.log(queryUsers);
+    //     const [results] = await conn.query(queryUsers);
+    //     conn.end();
+    //     res.json({
+    //         info: { count: results.length },
+    //         result: results,
+    //     });
+    // }
+    // catch (error) {
+    //     console.error("Error al obtener el listado de usuarios", error);
+    //     res.status(500).json({ error: "Error en la Base de datos" });
+    // }
 
+//Comprobar que este la usuaria
+try {
+    if (!req.body.userName) {
+        res.json({
+            success: false,
+            error: 'El nombre no puede estar vacío'
+        });
+        return;
+    }
+
+    // Comprobar si hay un usuario con el mismo nombre
+    const conn = await getConnection();
+    const checkUser = 'SELECT * FROM usuarios_db WHERE userName = ?';
+    const [result] = await conn.query(checkUser, [req.body.userName]);
+
+    if (result.length > 0) {
+        res.json({
+            success: false,
+            error: 'El nombre de usuario ya existe'
+        });
+        conn.end();
+        return;
+    }
+
+    const insertUser = 'INSERT INTO usuarios_db (email, userName, password) VALUES (?, ?, ?)';
+    const { email, userName, password } = req.body;
+    const [insertResults] = await conn.execute(insertUser, [email, userName, password]);
+    console.log(insertResults);
+    conn.end();
+
+    if (insertResults.affectedRows === 1) {
+        res.json({
+            success: true,
+            message: `El usuario ${userName} se ha creado correctamente`
+        });
+    } else {
+        res.json({
+            success: false,
+            error: `Error al crear el usuario`
+        });
+    }
+} catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({
+        success: false,
+        error: `Error en la base de datos`
+    });
+}
 
 });
 
