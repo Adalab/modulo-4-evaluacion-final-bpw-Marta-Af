@@ -3,6 +3,8 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const mysql = require('mysql2/promise');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');   
 
 //Crear Variables
 const server = express();
@@ -32,16 +34,13 @@ async function getConnection() {
 //Consultar si el id existe
 async function checkededId( conn, recetaId) {
     try {
-     
-        
+
         const checkId = `
             SELECT * FROM recetas
             WHERE id = ?
         `;
-        
+ 
         const [result] = await conn.execute(checkId, [recetaId]);
-       
-
         if (result.length === 0) {
             return {
                 success: false,
@@ -65,12 +64,6 @@ async function checkededId( conn, recetaId) {
 server.listen(port, () => {
     console.log(`Server has been started in http://localhost:${port}`)
 });
-const createErrorResponse = (message) => { //Crear mensaje de eror
-    return {
-        success: false,
-        error: message
-    };
-}
 //EndPoint
 //Listar recetas ok
 server.get('/api/recetas', async (req, res) => {
@@ -92,6 +85,26 @@ server.get('/api/recetas', async (req, res) => {
         res.status(500).json({ error: "Error en la Base de datos" });
     }
 
+});
+
+server.get('/api/usuarios_db', async (req, res) => {
+    try {
+        const conn = await getConnection();
+        const queryGetUser =
+            `SELECT * FROM usuarios_db;
+    `;
+        const [results] = await conn.query(queryGetUser);
+
+        conn.end();
+        res.json({
+            info: { count: results.length },
+            result: results,
+        });
+    }
+    catch (error) {
+        console.error("Error al obtener el listado de usuarios:", error);
+        res.status(500).json({ error: "Error en la Base de datos" });
+    }
 });
 
 //Obtener receta por id ok
@@ -236,35 +249,16 @@ server.delete('/api/recetas/:recetaId', async (req, res) => {
 });
  
 //Registro de usuario (POST /registro):
-server.post('/api/usuarios_db', async (req, res) => {
-    // try {
-    //     const conn = await getConnection();
-    //     const queryUsers =
-    //         `SELECT * FROM usuarios_db;
-    // `;
-    // console.log(queryUsers);
-    //     const [results] = await conn.query(queryUsers);
-    //     conn.end();
-    //     res.json({
-    //         info: { count: results.length },
-    //         result: results,
-    //     });
-    // }
-    // catch (error) {
-    //     console.error("Error al obtener el listado de usuarios", error);
-    //     res.status(500).json({ error: "Error en la Base de datos" });
-    // }
+server.post('/api/usuarios_db/registred', async (req, res) => {
 
-//Comprobar que este la usuaria
 try {
-    if (!req.body.userName) {
+    if (!req.body.userName || !req.body.email || !req.body.password) {
         res.json({
             success: false,
-            error: 'El nombre no puede estar vacío'
+            error: 'Debe rellenar todos los campos'
         });
         return;
     }
-
     // Comprobar si hay un usuario con el mismo nombre
     const conn = await getConnection();
     const checkUser = 'SELECT * FROM usuarios_db WHERE userName = ?';
@@ -278,11 +272,10 @@ try {
         conn.end();
         return;
     }
-
+    const crypedPass = await bcrypt.hash( req.body.password, 10 );
     const insertUser = 'INSERT INTO usuarios_db (email, userName, password) VALUES (?, ?, ?)';
     const { email, userName, password } = req.body;
-    const [insertResults] = await conn.execute(insertUser, [email, userName, password]);
-    console.log(insertResults);
+    const [insertResults] = await conn.execute(insertUser, [email, userName, crypedPass]);
     conn.end();
 
     if (insertResults.affectedRows === 1) {
@@ -303,7 +296,61 @@ try {
         error: `Error en la base de datos`
     });
 }
-
 });
 
 //Inicio de sesión (POST /login)
+server.post('/api/usuarios_db/loging', async (req, res ) => {
+try{
+ console.log(req.body);
+ // comprobamos que los datos esten rellenos
+ if (!req.body.email || !req.body.userName ) {
+    res.json({
+        success: false,
+        error: 'El email del usuario y el  nombre no puedes estar vacíos'
+    });
+    return;
+}
+    //Comprobar si el usuario y contraseña existe
+ const conn = await getConnection();
+ const checkUser = ` 
+    SELECT id, userName, password 
+    FROM usuarios_db 
+    WHERE userName = ?`;
+    const [result] = await conn.query(checkUser, [req.body.userName]);
+ conn.end();
+
+ if (result.length !== 1) {
+    return res.json({
+        success: false,
+        error: 'Las credenciales no son correctas'
+    });
+}
+
+
+const userData = result[0];
+console.log(userData);
+
+const correctPassword = await bcrypt.compare(req.body.password, userData.password);
+console.log("Nombre de usuario:", req.body.userName);
+console.log("Contraseña:", req.body.password);
+console.log("Comparación de contraseñas:", correctPassword);
+ if (correctPassword) {
+    return res.json({
+        success: true,
+        message: 'Inicio de sesión exitoso',
+        userId: userData.id
+    });
+} else {
+    return res.json({
+        success: false,
+        error: 'Las credenciales no son correctas'
+    });
+}
+} catch (error) {
+    console.error('Error:', error);
+    return res.status(500).json({
+        success: false,
+        error: `Error en la base de datos`
+    });
+}
+});
